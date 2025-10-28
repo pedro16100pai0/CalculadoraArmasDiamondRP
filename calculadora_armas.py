@@ -1,19 +1,56 @@
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QLineEdit, QComboBox, QTextEdit, QGroupBox
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
+    QLabel, QPushButton, QSpinBox, QComboBox, QTextEdit, QGroupBox, QFrame
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
 import sys
 
-# Dados (conforme a tua especificação)
+# Dados (conforme a tua especificação / imagem)
 REQ_BODY = {"Ferro": 100, "Cobre": 100, "Aluminio": 100, "Plastico": 150}
 REQ_OTHER = {"Ferro": 10, "Cobre": 10, "Aluminio": 10, "Plastico": 15}
 PIECES = ["Body", "Gun Barrel", "Gun Butt", "Gun Handle", "Gun Spring"]
 MATERIALS = ["Ferro", "Cobre", "Aluminio", "Plastico"]
+
+# Presets conforme a tabela da imagem. Mantive Body = 1 (como antes).
 PRESETS = {
-    "PDW": [1, 10, 10, 10, 10],   # 1 body + 10 de cada outra peça
-    "KBZ": [1, 18, 17, 18, 17],   # 1 body + 18/17/18/17
-    "P90": [1, 13, 13, 12, 12]    # 1 body + 13/13/12/12
+    "Five Seven":       [1, 2,  2,  3,  3],
+    "0.5":              [1, 6,  6,  6,  6],
+    "Tec-9":            [1, 5,  5,  5,  5],
+    "PDW":              [1, 10, 10, 10, 10],
+    "P90":              [1, 13, 13, 12, 12],
+    "Uzi":              [1, 8,  8,  7,  7],
+    "MK2":              [1, 8,  9,  9,  9],
+    "Compact-Rifle":    [1, 4,  4,  4,  3],
+    "QBZ":              [1, 18, 17, 18, 17],
+    "Ak-47":            [1, 18, 17, 18, 17],
+    "G3":               [1, 23, 21, 23, 21],
+    "Shotgun Tactica":  [1, 33, 31, 33, 31]
+}
+
+# Mapeamento do tipo de Body (Pistol / SMG / Rifle / Shotgun)
+BODY_TYPES = {
+    "Five Seven": "Pistol",
+    "0.5": "Pistol",
+    "Tec-9": "SMG",
+    "PDW": "SMG",
+    "P90": "SMG",
+    "Uzi": "SMG",
+    "MK2": "SMG",
+    "Compact-Rifle": "Rifle",
+    "QBZ": "Rifle",
+    "Ak-47": "Rifle",
+    "G3": "Rifle",
+    "Shotgun Tactica": "Shotgun"
+}
+
+# Cores para cada tipo (badge visual)
+BODY_TYPE_COLORS = {
+    "Pistol": "#FF8A65",
+    "SMG": "#4FC3F7",
+    "Rifle": "#81C784",
+    "Shotgun": "#BA68C8",
+    "": "#888888"
 }
 
 def calcular(quantidades_materiais, counts):
@@ -62,196 +99,253 @@ class Calculadora(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Calculadora de Armas")
-        self.setGeometry(100, 100, 900, 700)
-        self.setStyleSheet("background-color:black; font-size:14px; color:white;")
+        self.setGeometry(100, 100, 980, 720)
+        self.setStyleSheet("background-color:#0f1720; color: #E6EEF3;")
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout()
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(12)
 
         # Cabeçalho
         header = QLabel("💥 Calculadora de Armas 💥")
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        header.setStyleSheet("font-size:24px; font-weight:bold; color:#FFFFFF;")
+        header_font = QFont("Segoe UI", 20, QFont.Weight.Bold)
+        header.setFont(header_font)
+        header.setStyleSheet("""
+            color: white;
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #2b5876, stop:1 #4e4376);
+            padding: 12px;
+            border-radius: 10px;
+        """)
         layout.addWidget(header)
 
-        # Preset
+        # Preset + Tipo de Body
+        top_row = QHBoxLayout()
+        top_row.setSpacing(8)
+
+        preset_group = QGroupBox()
+        preset_group.setStyleSheet("QGroupBox { border: none; color: #E6EEF3; }")
         preset_layout = QHBoxLayout()
         preset_label = QLabel("Preset:")
-        preset_label.setStyleSheet("color:white;")
+        preset_label.setStyleSheet("color:#DDE7EF; font-weight:600;")
         preset_layout.addWidget(preset_label)
         self.preset_combo = QComboBox()
         self.preset_combo.addItems(PRESETS.keys())
+        self.preset_combo.setStyleSheet("""
+            QComboBox { background: #0b1220; color: #E6EEF3; padding: 6px; border-radius:6px; }
+            QComboBox QAbstractItemView { background: #071021; color: #E6EEF3; }
+        """)
         preset_layout.addWidget(self.preset_combo)
-        layout.addLayout(preset_layout)
+
+        # badge para o tipo
+        self.body_type_label = QLabel("")
+        self.body_type_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.body_type_label.setFixedHeight(28)
+        self.body_type_label.setMinimumWidth(120)
+        self.body_type_label.setStyleSheet("color: white; border-radius: 14px; padding: 4px;")
+        preset_layout.addWidget(self.body_type_label)
+        preset_group.setLayout(preset_layout)
+        top_row.addWidget(preset_group, stretch=1)
+
+        # Quick stats area
+        stats_group = QGroupBox()
+        stats_group.setStyleSheet("QGroupBox { border: none; color: #DDE7EF; }")
+        stats_layout = QHBoxLayout()
+        self.max_possible_label = QLabel("Máx (preset atual): 0")
+        self.max_possible_label.setStyleSheet("color:#CFECEC; font-weight:600;")
+        stats_layout.addWidget(self.max_possible_label)
+        stats_group.setLayout(stats_layout)
+        top_row.addWidget(stats_group, stretch=0)
+
+        layout.addLayout(top_row)
         self.preset_combo.currentTextChanged.connect(self.aplicar_preset)
 
-        # Peças
-        self.count_inputs = {}
+        # Divider
+        divider = QFrame()
+        divider.setFrameShape(QFrame.Shape.HLine)
+        divider.setStyleSheet("color: #203040;")
+        layout.addWidget(divider)
+
+        # Central area: peças à esquerda, materiais à direita
+        central = QHBoxLayout()
+        central.setSpacing(12)
+
+        # Left: Peças por arma
         pieces_group = QGroupBox("Peças por arma")
-        pieces_group.setStyleSheet("color:white;")
-        pieces_layout = QVBoxLayout()
-        for p in PIECES:
-            hl = QHBoxLayout()
+        pieces_group.setStyleSheet("""
+            QGroupBox { font-weight:700; color:#E6EEF3; border: 1px solid #203040; border-radius:8px; padding:8px; }
+        """)
+        pieces_layout = QGridLayout()
+        pieces_layout.setHorizontalSpacing(12)
+        pieces_layout.setVerticalSpacing(8)
+        self.count_inputs = {}
+        for i, p in enumerate(PIECES):
             label = QLabel(p + ":")
-            label.setStyleSheet("color:white;")
-            hl.addWidget(label)
-            inp = QLineEdit()
-            inp.setText("0")
-            inp.setStyleSheet("background-color:#333333; color:white;")
-            hl.addWidget(inp)
-            self.count_inputs[p] = inp
-            pieces_layout.addLayout(hl)
+            label.setStyleSheet("color:#DDE7EF;")
+            spin = QSpinBox()
+            spin.setRange(0, 9999)
+            spin.setButtonSymbols(QSpinBox.ButtonSymbols.UpDownArrows)
+            # Peças: mostrar o 0 por defeito (não usar special value)
+            spin.setStyleSheet("QSpinBox { background: #08121A; color: #E6EEF3; padding:4px; border-radius:6px; }")
+            pieces_layout.addWidget(label, i, 0)
+            pieces_layout.addWidget(spin, i, 1)
+            self.count_inputs[p] = spin
         pieces_group.setLayout(pieces_layout)
-        layout.addWidget(pieces_group)
+        central.addWidget(pieces_group, stretch=2)
 
-        # Materiais
-        self.mat_inputs = {}
+        # Right: Materiais disponíveis + desejado + botão
+        right_v = QVBoxLayout()
         mat_group = QGroupBox("Materiais disponíveis")
-        mat_group.setStyleSheet("color:white;")
-        mat_layout = QVBoxLayout()
-        for m in MATERIALS:
-            hl = QHBoxLayout()
+        mat_group.setStyleSheet("""
+            QGroupBox { font-weight:700; color:#E6EEF3; border: 1px solid #203040; border-radius:8px; padding:8px; }
+        """)
+        mat_layout = QGridLayout()
+        mat_layout.setHorizontalSpacing(12)
+        mat_layout.setVerticalSpacing(8)
+        self.mat_inputs = {}
+        for i, m in enumerate(MATERIALS):
             label = QLabel(m + ":")
-            label.setStyleSheet("color:white;")
-            hl.addWidget(label)
-            inp = QLineEdit()
-            inp.setText("0")
-            inp.setStyleSheet("background-color:#333333; color:white;")
-            hl.addWidget(inp)
-            self.mat_inputs[m] = inp
-            mat_layout.addLayout(hl)
+            label.setStyleSheet("color:#DDE7EF;")
+            spin = QSpinBox()
+            spin.setRange(0, 1000000)
+            spin.setButtonSymbols(QSpinBox.ButtonSymbols.UpDownArrows)
+            # Materiais: mostrar vazio quando o valor for 0 (sem exibir "0")
+            spin.setSpecialValueText("")
+            spin.setStyleSheet("QSpinBox { background: #08121A; color: #E6EEF3; padding:4px; border-radius:6px; }")
+            mat_layout.addWidget(label, i, 0)
+            mat_layout.addWidget(spin, i, 1)
+            self.mat_inputs[m] = spin
         mat_group.setLayout(mat_layout)
-        layout.addWidget(mat_group)
+        right_v.addWidget(mat_group)
 
-        # Desejado: número de armas que o utilizador quer fabricar
+        # Desejado + botão
         desired_layout = QHBoxLayout()
         desired_label = QLabel("Número de armas desejadas:")
-        desired_label.setStyleSheet("color:white;")
+        desired_label.setStyleSheet("color:#DDE7EF;")
         desired_layout.addWidget(desired_label)
-        self.desired_input = QLineEdit()
-        self.desired_input.setText("0")
-        self.desired_input.setStyleSheet("background-color:#333333; color:white;")
+        self.desired_input = QSpinBox()
+        self.desired_input.setRange(0, 1000000)
+        # Desejado: mostrar o 0 por defeito
+        self.desired_input.setStyleSheet("QSpinBox { background: #08121A; color: #E6EEF3; padding:4px; border-radius:6px; }")
         desired_layout.addWidget(self.desired_input)
-        layout.addLayout(desired_layout)
+        right_v.addLayout(desired_layout)
 
-        # Botão Calcular (opcional, já recalcula automaticamente)
         calc_btn = QPushButton("Calcular")
-        calc_btn.setStyleSheet("background-color:#2B3A67; color:white; font-weight:bold; height:35px;")
+        calc_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #3b6978, stop:1 #2a5368);
+                color: white; font-weight:700; padding:8px; border-radius:8px;
+            }
+            QPushButton:hover { opacity: 0.95; }
+        """)
         calc_btn.clicked.connect(self.mostrar_resultado)
-        layout.addWidget(calc_btn)
+        right_v.addWidget(calc_btn)
 
-        # Resultado
+        central.addLayout(right_v, stretch=1)
+
+        layout.addLayout(central)
+
+        # Resultado (compacto)
         self.result_txt = QTextEdit()
         self.result_txt.setReadOnly(True)
-        self.result_txt.setStyleSheet("background-color:#1C1C1C; color:white; font-family:Courier; font-size:14px;")
+        self.result_txt.setStyleSheet("""
+            QTextEdit { background: #041018; color: #E6EEF3; border: 1px solid #203040; border-radius:8px;
+                       font-family: 'Segoe UI', sans-serif; font-size:13px; padding:8px; }
+        """)
+        self.result_txt.setFixedHeight(180)
         layout.addWidget(self.result_txt)
 
         self.setLayout(layout)
 
-        # Conecta mudanças manuais nos QLineEdit para recalcular automaticamente
-        for inp in self.count_inputs.values():
-            inp.textChanged.connect(self._on_text_changed)
-        for inp in self.mat_inputs.values():
-            inp.textChanged.connect(self._on_text_changed)
-        self.desired_input.textChanged.connect(self._on_text_changed)
+        # Conecta mudanças para recalcular automaticamente
+        for spin in self.count_inputs.values():
+            spin.valueChanged.connect(self._on_value_changed)
+        for spin in self.mat_inputs.values():
+            spin.valueChanged.connect(self._on_value_changed)
+        self.desired_input.valueChanged.connect(self._on_value_changed)
 
-        # Aplica preset inicial (vai preencher os QLineEdit das peças e recalcular)
+        # Aplica preset inicial
         self.aplicar_preset()
 
-    def _on_text_changed(self, _=None):
-        # Chamado sempre que um QLineEdit é editado; tentar recalcular (mostrar_resultado trata erros)
+    def _on_value_changed(self, _=None):
+        # recalcula automaticamente
         self.mostrar_resultado()
 
     def aplicar_preset(self):
         preset = self.preset_combo.currentText()
         vals = PRESETS.get(preset, PRESETS["PDW"])
         for i, p in enumerate(PIECES):
-            self.count_inputs[p].setText(str(vals[i]))
-        # Recalcula imediatamente para mostrar os resultados ao trocar preset
+            self.count_inputs[p].setValue(vals[i])
+        # Atualiza label do tipo de Body (com cor)
+        tipo = BODY_TYPES.get(preset, "")
+        color = BODY_TYPE_COLORS.get(tipo, BODY_TYPE_COLORS[""])
+        if tipo:
+            self.body_type_label.setText(f"{tipo}")
+            self.body_type_label.setStyleSheet(
+                f"color: white; background: {color}; border-radius: 14px; padding:4px; font-weight:700;"
+            )
+        else:
+            self.body_type_label.setText("")
+            self.body_type_label.setStyleSheet("color: white; background: #444444; border-radius: 14px; padding:4px;")
+
+        # Recalcula e atualiza estatísticas rápidas
         self.mostrar_resultado()
 
     def mostrar_resultado(self):
         # Lê entradas e valida
         try:
-            mats = {}
-            for m in MATERIALS:
-                txt = self.mat_inputs[m].text().strip()
-                mats[m] = int(txt) if txt != "" else 0
-                if mats[m] < 0:
-                    raise ValueError("Materiais não podem ser negativos")
-            counts = []
-            for p in PIECES:
-                txt = self.count_inputs[p].text().strip()
-                counts.append(int(txt) if txt != "" else 0)
-            if any(c < 0 for c in counts):
-                raise ValueError("Peças por arma não podem ser negativas")
-            # Desired number of weapons
-            txtd = self.desired_input.text().strip()
-            desired = int(txtd) if txtd != "" else 0
-            if desired < 0:
-                raise ValueError("Número de armas desejadas não pode ser negativo")
+            mats = {m: self.mat_inputs[m].value() for m in MATERIALS}
+            counts = [self.count_inputs[p].value() for p in PIECES]
+            desired = self.desired_input.value()
+            if any(c < 0 for c in counts) or any(v < 0 for v in mats.values()) or desired < 0:
+                raise ValueError("Valores não podem ser negativos")
         except Exception as e:
-            self.result_txt.setText(f"Erro: insere inteiros não negativos. Detalhe: {e}")
+            self.result_txt.setHtml(f"<div style='color:#FF8A65'>Erro: insere inteiros não negativos.</div>")
             return
 
-        # Faz o cálculo base para o preset atualmente selecionado
+        # Faz o cálculo base
         try:
             max_armas, limites, sobra, neces_por_arma = calcular(mats, counts)
         except Exception as e:
-            self.result_txt.setText(f"Erro no cálculo: {e}")
+            self.result_txt.setHtml(f"<div style='color:#FF8A65'>Erro no cálculo.</div>")
             return
 
-        # Mostrar quantas armas de cada PRESET (PDW/KBZ/P90) consigo fazer com os materiais atuais
-        preset_possiveis = {}
-        for pname, pcounts in PRESETS.items():
-            ma, _, _, _ = calcular(mats, pcounts)
-            preset_possiveis[pname] = ma
+        # Atualiza label de estatísticas rápidas
+        self.max_possible_label.setText(f"Máx (preset atual): {max_armas}")
 
-        # Calcula materiais necessários para 'desired' armas (do preset selecionado)
+        # Preparar informações essenciais
+        preset_atual = self.preset_combo.currentText()
+        tipo = BODY_TYPES.get(preset_atual, "N/A")
+
+        # Quantidades necessárias para 'desired'
         required_total = {m: neces_por_arma[m] * desired for m in MATERIALS}
         falta = {m: max(0, required_total[m] - mats[m]) for m in MATERIALS}
-        sobra_apos = {m: mats[m] - required_total[m] for m in MATERIALS}  # positivo se sobra, negativo se falta
 
-        # Formata saída
-        resultado = f"=== PRESET ATUAL: {self.preset_combo.currentText()} ===\n"
-        resultado += "Peças por arma:\n"
-        for p, c in zip(PIECES, counts):
-            resultado += f"  {p}: {c}\n"
+        # Verifica se há faltas
+        faltas_list = [(m, falta[m]) for m in MATERIALS if falta[m] > 0]
 
-        resultado += "\nMateriais necessários por 1 arma (preset atual):\n"
-        for m in MATERIALS:
-            resultado += f"  {m}: {neces_por_arma[m]}\n"
+        # Construir output minimal em HTML
+        badge_color = BODY_TYPE_COLORS.get(tipo, "#888888")
+        html = f"<div><strong>{preset_atual}</strong>  <span style='background:{badge_color};color:#fff;padding:4px 8px;border-radius:10px;margin-left:8px'>{tipo}</span></div>"
+        html += f"<div style='margin-top:6px'>Máx possível (preset atual): <strong>{max_armas}</strong></div>"
 
-        resultado += "\nCom os materiais atuais consegues fabricar (por preset):\n"
-        for pname, ma in preset_possiveis.items():
-            resultado += f"  {pname}: {ma} armas\n"
-
-        resultado += f"\nMáximo de armas possíveis com os materiais atuais (preset atual): {max_armas}\n"
-
-        resultado += "\nSobra de materiais após fabricar o máximo de armas (preset atual):\n"
-        for m in MATERIALS:
-            resultado += f"  {m}: {sobra[m]}\n"
-
-        resultado += f"\n---\nPara fabricar {desired} armas (preset atual):\n"
+        # Desired block (essential)
+        html += f"<div style='margin-top:8px'>Desejado: <strong>{desired}</strong></div>"
         if desired == 0:
-            resultado += "  (Nenhuma arma desejada)\n"
+            html += "<div style='color:#94A3B8;margin-top:6px'>(Nenhuma arma desejada)</div>"
         else:
-            resultado += "Materiais necessários no total:\n"
-            for m in MATERIALS:
-                resultado += f"  {m}: {required_total[m]}  (Tens: {mats[m]}  --> "
-                if falta[m] > 0:
-                    resultado += f"Falta: {falta[m]})\n"
-                else:
-                    resultado += f"Suficiente, sobra: {sobra_apos[m]})\n"
-
-            # Indica se é possível fabricar a quantidade desejada do preset atual
-            if all(mats[m] >= required_total[m] for m in MATERIALS):
-                resultado += "\nResultado: Tens materiais suficientes para fabricar o número desejado de armas.\n"
+            if not faltas_list:
+                html += "<div style='color:#81C784;margin-top:6px'><strong>Suficiente</strong> — tens materiais para fabricar o desejado.</div>"
             else:
-                resultado += "\nResultado: Não tens materiais suficientes para fabricar o número desejado. Lista de faltas acima.\n"
+                # Mostrar apenas faltas essenciais
+                faltas_html = ", ".join(f"{m}: {q}" for m, q in faltas_list)
+                html += f"<div style='color:#FF8A65;margin-top:6px'><strong>Falta:</strong> {faltas_html}</div>"
 
-        self.result_txt.setText(resultado)
+        # Define o HTML no QTextEdit (compacto)
+        self.result_txt.setHtml(html)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
